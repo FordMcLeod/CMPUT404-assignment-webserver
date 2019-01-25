@@ -1,5 +1,5 @@
 #  coding: utf-8 
-import socketserver
+import socketserver, mimetypes, os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -31,11 +31,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print(self.data)
         self.data = self.data.decode(encoding="utf-8")
-        print(self.data)
         self.data = self.data.split("\r\n")
-        print(self.data)
         # The HTTP request
         request = self.data[0]
         # Processing headers 
@@ -45,30 +42,43 @@ class MyWebServer(socketserver.BaseRequestHandler):
             headers[key] = value
         method = request.split(" ")[0]
         error404page = "<html><h1>404 Error: Not Found</h1></html>"  
-        error405page = "<html><h1>405 Error: Method not supported</h1></html>"  
+        error405page = "<html><h1>405 Error: Method not allowed</h1></html>"  
 
         if(method == "GET"):
-            print("Recieved a GET request")
             _,location,HTTP = request.split(" ")
+            path = os.path.abspath("www"+location)
             try:
-                with open("www"+location,"r") as currfile:
+                with open(path,"r") as currfile:
                     content = currfile.read() 
-                foundHeader = "HTTP/1.1 200 OK \r\n\r\n"
+                contentType,_ = mimetypes.guess_type("www"+location)
+                if contentType:
+                    foundHeader = "HTTP/1.1 200 OK \r\nContent-type: "+contentType+"\r\n\r\n"
+                else:
+                    foundHeader = "HTTP/1.1 200 OK \r\nContent-type:text/plain\r\n\r\n"
                 package = foundHeader+content
                 self.request.sendall(bytearray(package,'utf-8'))
-                print("THAT FILE DOES EXIST")
+
+            except IsADirectoryError:
+                with open(path+"/index.html","r") as currfile:
+                    content = currfile.read() 
+                contentType,_ = mimetypes.guess_type("www"+location+"index.html")
+                if contentType:
+                    foundHeader = "HTTP/1.1 200 OK \r\nContent-type: "+contentType+"\r\n\r\n"
+                else:
+                    foundHeader = "HTTP/1.1 200 OK \r\nContent-type:text/plain\r\n\r\n"
+                package = foundHeader+content
+                self.request.sendall(bytearray(package,'utf-8'))
+ 
             except FileNotFoundError:
                 errorheader = """HTTP/1.1 404 Not Found \r\n\r\n"""
-                package = errorheader + self.error404page
+                package = errorheader + error404page
                 self.request.sendall(bytearray(package,'utf-8'))
-                print("THAT FILE DOESN'T EXIST")
 
         else:
             errorheader = """HTTP/1.1 405 Method Not Allowed\r\n\r\n"""
             package = errorheader + self.error405page
             self.request.sendall(bytearray(package,'utf-8'))
             
-        self.request.sendall(bytearray("OK",'utf-8'))
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
