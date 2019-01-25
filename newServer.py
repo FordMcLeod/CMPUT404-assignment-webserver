@@ -46,14 +46,10 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
         if(method == "GET"):
             _,location,HTTP = request.split(" ")
-            path = os.path.realpath("www"+location)
-
-            print(path)
-            if(path[0:5] == '/www/'):
-                print("we in the right dir")
+            path = os.path.abspath("www"+location)
             # If a valid file
             if os.path.isfile(path):
-                with open(path,"r") as currfile:
+                with open(path,"r") as currFile:
                     content = currfile.read() 
                     contentType,_ = mimetypes.guess_type("www"+location)
                     if contentType:
@@ -63,9 +59,9 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     package = foundHeader+content
                     self.request.sendall(bytearray(package,'utf-8'))
             # If an OK dir 
-            elif os.path.isdir(path) and path[-1] == "/":
+            if os.path.isdir(path) and path[-1] == "/":
                 path += "index.html"
-                with open(path,"r") as currfile:
+                with open(path,"r") as currFile:
                     content = currfile.read() 
                     contentType,_ = mimetypes.guess_type("www"+location)
                     if contentType:
@@ -81,13 +77,12 @@ class MyWebServer(socketserver.BaseRequestHandler):
                  self.request.sendall(bytearray(redirHeader,'utf-8'))
                   
             # Else 404       
-            else:
-                errorheader = "HTTP/1.1 404 Not Found \r\n\r\n"
-                package = errorheader
-                self.request.sendall(bytearray(package,'utf-8'))
+            errorheader = """HTTP/1.1 404 Not Found \r\n\r\n"""
+            package = errorheader + error404page
+            self.request.sendall(bytearray(package,'utf-8'))
         else:
             # Else 405
-            errorheader = "HTTP/1.1 405 Method Not Allowed\r\n\r\n"
+            errorheader = """HTTP/1.1 405 Method Not Allowed\r\n\r\n"""
             package = errorheader + self.error405page
             self.request.sendall(bytearray(package,'utf-8'))
                 
