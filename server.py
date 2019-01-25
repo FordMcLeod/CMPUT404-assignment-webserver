@@ -2,6 +2,7 @@
 import socketserver, mimetypes, os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
+# Copyright 2019 Owen McLeod
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,11 +36,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
         self.data = self.data.split("\r\n")
         # The HTTP request
         request = self.data[0]
-        # Processing headers 
-        headers = {}
-        for line in self.data[1:]:
-            key,value = line.split(": ",maxsplit=1)
-            headers[key] = value
         method = request.split(" ")[0]
 
         if(method == "GET"):
@@ -47,18 +43,17 @@ class MyWebServer(socketserver.BaseRequestHandler):
             path = os.path.relpath("www"+location)
             
             if(path[0:3] != 'www'):
-                # Trying to go OOB
+                # User trying to go out-of-bounds
                 self.err404()
                 return
+
             # If a valid file
             if os.path.isfile(path):
                 self.sendcontent(path)
             # If 301
             elif location[-1] != "/" and os.path.isdir(path):
                 path += "/"
-                redirHeader = "HTTP/1.1 301 Moved Permanently\r\nLocation: "+path+"\r\n\r\n"
-                self.request.sendall(bytearray(redirHeader,'utf-8'))
-                return
+                self.redir301(path)
 
            # If an OK dir 
             elif os.path.isdir(path):
@@ -70,13 +65,19 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 self.err404() 
                 return
         else:
-            # Else 405
-            errorheader = "HTTP/1.1 405 Method Not Allowed\r\n\r\n"
-            self.request.sendall(bytearray(errorheader,'utf-8'))
-                
+            self.err405()
+
     def err404(self):
         errorheader = "HTTP/1.1 404 Not Found \r\n\r\n"
         self.request.sendall(bytearray(errorheader,'utf-8'))
+    
+    def err405(self):
+        errorheader = "HTTP/1.1 405 Method Not Allowed\r\n\r\n"
+        self.request.sendall(bytearray(errorheader,'utf-8'))
+
+    def redir301(self,path): 
+        redirHeader = "HTTP/1.1 301 Moved Permanently\r\nLocation: "+path+"\r\n\r\n"
+        self.request.sendall(bytearray(redirHeader,'utf-8'))
 
     def sendcontent(self,path):
         with open(path,"r") as currfile:
