@@ -41,56 +41,54 @@ class MyWebServer(socketserver.BaseRequestHandler):
             key,value = line.split(": ",maxsplit=1)
             headers[key] = value
         method = request.split(" ")[0]
-        error404page = "<html><h1>404 Error: Not Found</h1></html>"  
-        error405page = "<html><h1>405 Error: Method not allowed</h1></html>"  
 
         if(method == "GET"):
             _,location,HTTP = request.split(" ")
-            path = os.path.realpath("www"+location)
-
-            print(path)
-            if(path[0:5] == '/www/'):
-                print("we in the right dir")
+            path = os.path.relpath("www"+location)
+            
+            if(path[0:3] != 'www'):
+                # Trying to go OOB
+                self.err404()
+                return
             # If a valid file
             if os.path.isfile(path):
-                with open(path,"r") as currfile:
-                    content = currfile.read() 
-                    contentType,_ = mimetypes.guess_type("www"+location)
-                    if contentType:
-                        foundHeader = "HTTP/1.1 200 OK \r\nContent-type: "+contentType+"\r\n\r\n"
-                    else:
-                        foundHeader = "HTTP/1.1 200 OK \r\nContent-type:text/plain\r\n\r\n"
-                    package = foundHeader+content
-                    self.request.sendall(bytearray(package,'utf-8'))
-            # If an OK dir 
-            elif os.path.isdir(path) and path[-1] == "/":
-                path += "index.html"
-                with open(path,"r") as currfile:
-                    content = currfile.read() 
-                    contentType,_ = mimetypes.guess_type("www"+location)
-                    if contentType:
-                        foundHeader = "HTTP/1.1 200 OK \r\nContent-type: "+contentType+"\r\n\r\n"
-                    else:
-                        foundHeader = "HTTP/1.1 200 OK \r\nContent-type:text/plain\r\n\r\n"
-                    package = foundHeader+content
-                    self.request.sendall(bytearray(package,'utf-8'))
+                self.sendcontent(path)
             # If 301
-            elif os.path.isdir(path+"/"):
-                 path += "/"
-                 redirHeader = "HTTP/1.1 301 Moved Permanently\r\nLocation: "+path+"\r\n\r\n"
-                 self.request.sendall(bytearray(redirHeader,'utf-8'))
-                  
+            elif location[-1] != "/" and os.path.isdir(path):
+                path += "/"
+                redirHeader = "HTTP/1.1 301 Moved Permanently\r\nLocation: "+path+"\r\n\r\n"
+                self.request.sendall(bytearray(redirHeader,'utf-8'))
+                return
+
+           # If an OK dir 
+            elif os.path.isdir(path):
+                path += "/index.html"
+                self.sendcontent(path)
+                 
             # Else 404       
             else:
-                errorheader = "HTTP/1.1 404 Not Found \r\n\r\n"
-                package = errorheader
-                self.request.sendall(bytearray(package,'utf-8'))
+                self.err404() 
+                return
         else:
             # Else 405
             errorheader = "HTTP/1.1 405 Method Not Allowed\r\n\r\n"
-            package = errorheader + self.error405page
-            self.request.sendall(bytearray(package,'utf-8'))
+            self.request.sendall(bytearray(errorheader,'utf-8'))
                 
+    def err404(self):
+        errorheader = "HTTP/1.1 404 Not Found \r\n\r\n"
+        self.request.sendall(bytearray(errorheader,'utf-8'))
+
+    def sendcontent(self,path):
+        with open(path,"r") as currfile:
+                    content = currfile.read() 
+                    contentType,_ = mimetypes.guess_type(path)
+                    if contentType:
+                        foundHeader = "HTTP/1.1 200 OK \r\nContent-type: "+contentType+"\r\n\r\n"
+                    else:
+                        foundHeader = "HTTP/1.1 200 OK \r\nContent-type:text/plain\r\n\r\n"
+                    package = foundHeader+content
+                    self.request.sendall(bytearray(package,'utf-8'))
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
